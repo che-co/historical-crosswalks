@@ -3,11 +3,12 @@
 library(rgdal)
 library(rgeos)
 library(maptools)
-library(classInt)
+library(RColorBrewer)
+colors <- colorRampPalette(c("red","grey"))(4)
 
 #### Function to add w/o NA ####
 
-`%+na%` <- function(a, b){ifelse(is.na(a), b, ifelse(is.na(b), a, a+b))}
+`%*na%` <- function(a, b){ifelse(is.na(a), b, ifelse(is.na(b), a, a*b))}
 
 #### Paths for Shape Files ####
 
@@ -34,7 +35,6 @@ nhgis1860.pop$frac_free <- nhgis1860.pop$n_free / nhgis1860.pop$t_pop
 nhgis1860.pop$frac_free_blk <- nhgis1860.pop$n_free_blk / nhgis1860.pop$n_blk
 nhgis1860.pop[is.nan(nhgis1860.pop$frac_free_blk), "frac_free_blk"] <- NA 
 nhgis1860.pop$frac_slv <- nhgis1860.pop$n_slv / nhgis1860.pop$t_pop  
-vars <- c("t_pop", "n_wht", "n_free_blk", "n_slv", "n_blk", "n_free")
 
 #### Calculate Spatial Adjustments ####
 
@@ -73,16 +73,15 @@ names(tmp)[2] <- "sum_frac_1860"
 overlap <- data.frame(overlap, sum_frac_1860=tmp[match(overlap$cty1860, tmp$cty1860), "sum_frac_1860"])
 overlap$scaled_frac_1860 <- overlap$frac_1860 * (1/overlap$sum_frac_1860)
 
-us.cty2015@data[, vars] <- 0
-for(i in 1:nrow(overlap)){
-	us.cty2015@data[overlap$cty2015[i], vars] <- us.cty2015@data[overlap$cty2015[i], vars] + (overlap$scaled_frac_1860[i] * us.cty1860@data[overlap$cty1860[i], vars])
-}
+vars <- c("t_pop", "n_wht", "n_free_blk", "n_slv", "n_blk", "n_free")
+
+us.cty2015@data[, vars] <- 0 
+
+for(i in levels(overlap$cty2015)) us.cty2015@data[i, vars] <- colSums(overlap$scaled_frac_1860[which(overlap$cty2015==i)] * us.cty1860@data[overlap$cty1860[which(overlap$cty2015==i)], vars])
 
 vars_wona <- paste0(vars, "_wona")
 
-us.cty2015@data[, vars_wona] <- 0
-for(i in 1:nrow(overlap)){
-	us.cty2015@data[overlap$cty2015[i], vars_wona] <- us.cty2015@data[overlap$cty2015[i], vars_wona] %+na% (overlap$scaled_frac_1860[i] * us.cty1860@data[overlap$cty1860[i], vars])
-}
+us.cty2015@data[, vars_wona] <- 0 
 
+for(i in levels(overlap$cty2015)) us.cty2015@data[i, vars_wona] <- colSums(overlap$scaled_frac_1860[which(overlap$cty2015==i)] * us.cty1860@data[overlap$cty1860[which(overlap$cty2015==i)], vars], na.rm=T)
 
